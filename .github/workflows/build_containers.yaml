@@ -16,9 +16,11 @@ jobs:
         base:
           - {image: 'ghcr.io/bioconductor/rocker-r-ver', amdtag: 'devel-amd64', armtag: 'devel-arm64', outname: 'r-ver'}
           - {image: 'ghcr.io/bioconductor/rocker-rstudio', amdtag: 'devel-amd64', armtag: 'devel-arm64', outname: 'bioconductor_docker'}
-          - {image: 'rocker/tidyverse', amdtag: '4.4.1', armtag: 'N/A', outname: 'tidyverse'}
-          - {image: 'rocker/ml-verse', amdtag: '4.4.1', armtag: 'N/A', outname: 'ml-verse'}
-          - {image: 'rocker/shiny', amdtag: '4.4.1', armtag: 'N/A', outname: 'shiny'}
+          - {image: 'rocker/tidyverse', amdtag: 'devel', armtag: 'N/A', outname: 'tidyverse'}
+          - {image: 'ghcr.io/bioconductor/rocker-cuda', amdtag: 'devel-amd64', armtag: 'N/A', outname: 'cuda'}
+          - {image: 'ghcr.io/bioconductor/rocker-ml', amdtag: 'devel-amd64', armtag: 'N/A', outname: 'ml'}
+          - {image: 'ghcr.io/bioconductor/rocker-ml-verse', amdtag: 'devel', armtag: 'N/A', outname: 'ml-verse'}
+          - {image: 'rocker/shiny', amdtag: 'devel', armtag: 'N/A', outname: 'shiny'}
 
     name: Build branch images
     runs-on: ubuntu-latest
