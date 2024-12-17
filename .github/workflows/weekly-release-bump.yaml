@@ -21,6 +21,11 @@ jobs:
         echo "Detected latest release branch: $latest_branch"
         echo "branch=$latest_branch" >> $GITHUB_OUTPUT
 
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ steps.find-branch.outputs.branch }}
+        token: ${{ secrets.PAT }}
+
     - name: Run patch bump script and push
       run: |
         git checkout ${{ steps.find-branch.outputs.branch }}
