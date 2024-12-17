@@ -35,7 +35,7 @@ jobs:
         curl https://raw.githubusercontent.com/${{ github.repository }}/${{steps.defs.outputs.release-tag}}/.github/workflows/build_containers.yaml | grep 'amdtag' | awk -F"'" '/amdtag:/ {print $4}' | uniq > /tmp/currtag
         RELEASE_R_VER=$(curl https://bioconductor.org/config.yaml | yq e '.r_ver_for_bioc_ver."${{steps.defs.outputs.releasebiocver}}"')
         LATEST_TAG=$(cat /tmp/taglist | grep "$RELEASE_R_VER" | sort -n | tail -n 1)
-        CURR_TAG=$(cat /tmp/currtag | sort -n | tail -n 1)
+        CURR_TAG=$(cat /tmp/currtag | sort -n | tail -n 1 | cut -d'-' -f1)
         echo latest-tag=$LATEST_TAG >> $GITHUB_OUTPUT
         if [ "$LATEST_TAG" == "$CURR_TAG" ]; then
           echo "Detected '$LATEST_TAG' == '$CURR_TAG' as latest available tag"
