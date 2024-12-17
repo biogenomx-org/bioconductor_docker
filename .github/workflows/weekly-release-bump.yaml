@@ -17,7 +17,7 @@ jobs:
       id: find-branch
       run: |
         latest_version=$(git branch -r | grep 'origin/RELEASE_' | sed 's|origin/||' | grep -oP 'RELEASE_\K\d+_\d+' | sort -Vr | head -n1)
-        latest_branch="RELEASE_${latest_version//_/.}"
+        latest_branch=$(echo "RELEASE_${latest_version}" | sed 's/\./_/g')
         echo "Detected latest release branch: $latest_branch"
         echo "branch=$latest_branch" >> $GITHUB_OUTPUT
 
