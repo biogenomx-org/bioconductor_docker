@@ -20,10 +20,10 @@ jobs:
           - {image: 'rocker/tidyverse', amdtag: 'devel', outname: 'tidyverse'}
           - {image: 'ghcr.io/bioconductor/rocker-cuda', amdtag: 'devel-amd64', outname: 'cuda'}
           - {image: 'ghcr.io/bioconductor/rocker-ml', amdtag: 'devel-amd64', outname: 'ml'}
-          - {image: 'ghcr.io/bioconductor/rocker-ml-verse', amdtag: 'devel', outname: 'ml-verse'}
+          - {image: 'ghcr.io/bioconductor/rocker-ml-verse', amdtag: 'devel-amd64', outname: 'ml-verse'}
           - {image: 'rocker/shiny', amdtag: 'devel', outname: 'shiny'}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Free root space
         uses: almahmoud/free-root-space@main
