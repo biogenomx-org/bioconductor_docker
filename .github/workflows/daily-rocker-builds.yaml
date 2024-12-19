@@ -125,7 +125,6 @@ jobs:
           - { arch: 'arm64', runner: 'ubuntu-latest-arm64' }
     runs-on: ${{ matrix.build.runner }}
     needs: buildrver
-    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
 
@@ -141,12 +140,6 @@ jobs:
         echo biocver=$(echo ${{ github.event.inputs.biocver || '3.21' }}) >> $GITHUB_OUTPUT
         echo registryuser=$(echo ${{ github.repository_owner }} | awk '{print tolower($0)}') >> $GITHUB_OUTPUT
         echo rockerintermediateprefix=$(echo "ghcr.io/${{ github.repository_owner }}/rocker" | awk '{print tolower($0)}') >> $GITHUB_OUTPUT
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: arm64
-      if: matrix.build.arch == 'arm64'
 
     - name: Login to GHCR
       uses: docker/login-action@v2
@@ -203,12 +196,6 @@ jobs:
         echo registryuser=$(echo ${{ github.repository_owner }} | awk '{print tolower($0)}') >> $GITHUB_OUTPUT
         echo rockerintermediateprefix=$(echo "ghcr.io/${{ github.repository_owner }}/rocker" | awk '{print tolower($0)}') >> $GITHUB_OUTPUT
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: arm64
-      if: matrix.build.arch == 'arm64'
-
     - name: Login to GHCR
       uses: docker/login-action@v2
       with:
@@ -254,12 +241,6 @@ jobs:
         echo biocver=$(echo ${{ github.event.inputs.biocver || '3.21' }}) >> $GITHUB_OUTPUT
         echo registryuser=$(echo ${{ github.repository_owner }} | awk '{print tolower($0)}') >> $GITHUB_OUTPUT
         echo rockerintermediateprefix=$(echo "ghcr.io/${{ github.repository_owner }}/rocker" | awk '{print tolower($0)}') >> $GITHUB_OUTPUT
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: arm64
-      if: matrix.build.arch == 'arm64'
 
     - name: Login to GHCR
       uses: docker/login-action@v2
