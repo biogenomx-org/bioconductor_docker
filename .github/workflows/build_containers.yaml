@@ -9,33 +9,26 @@ on:
     - cron: '0 18 * * 5'
 
 jobs:
-  build:
+  build-amd64:
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         base:
-          - {image: 'ghcr.io/bioconductor/rocker-r-ver', amdtag: 'devel-amd64', armtag: 'devel-arm64', outname: 'r-ver'}
-          - {image: 'ghcr.io/bioconductor/rocker-rstudio', amdtag: 'devel-amd64', armtag: 'devel-arm64', outname: 'bioconductor_docker'}
-          - {image: 'rocker/tidyverse', amdtag: 'devel', armtag: 'N/A', outname: 'tidyverse'}
-          - {image: 'ghcr.io/bioconductor/rocker-cuda', amdtag: 'devel-amd64', armtag: 'N/A', outname: 'cuda'}
-          - {image: 'ghcr.io/bioconductor/rocker-ml', amdtag: 'devel-amd64', armtag: 'N/A', outname: 'ml'}
-          - {image: 'ghcr.io/bioconductor/rocker-ml-verse', amdtag: 'devel', armtag: 'N/A', outname: 'ml-verse'}
-          - {image: 'rocker/shiny', amdtag: 'devel', armtag: 'N/A', outname: 'shiny'}
-
-    name: Build branch images
-    runs-on: ubuntu-latest
+          - {image: 'ghcr.io/bioconductor/rocker-r-ver', amdtag: 'devel-amd64', outname: 'r-ver'}
+          - {image: 'ghcr.io/bioconductor/rocker-rstudio', amdtag: 'devel-amd64', outname: 'bioconductor_docker'}
+          - {image: 'rocker/tidyverse', amdtag: 'devel', outname: 'tidyverse'}
+          - {image: 'ghcr.io/bioconductor/rocker-cuda', amdtag: 'devel-amd64', outname: 'cuda'}
+          - {image: 'ghcr.io/bioconductor/rocker-ml', amdtag: 'devel-amd64', outname: 'ml'}
+          - {image: 'ghcr.io/bioconductor/rocker-ml-verse', amdtag: 'devel', outname: 'ml-verse'}
+          - {image: 'rocker/shiny', amdtag: 'devel', outname: 'shiny'}
     steps:
       - uses: actions/checkout@v3
-
+      
       - name: Free root space
         uses: almahmoud/free-root-space@main
         with:
           verbose: true
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-        with:
-          platforms: arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -53,7 +46,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata for container image
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v4
         with:
@@ -61,54 +54,193 @@ jobs:
           tags: |
             type=raw,value={{branch}}
 
-      - name: Set comma-separated list with all repository names
-        id: images
+      - name: Build and push AMD64 by digest
+        id: build
+        uses: docker/build-push-action@v3
+        with:
+          build-args: |
+            BASE_IMAGE=${{ matrix.base.image }}
+            amd64_tag=${{ matrix.base.amdtag }}
+          file: Dockerfile
+          platforms: linux/amd64
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ github.repository_owner }}/${{ matrix.base.outname }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
         run: |
-          IMG=${{ steps.meta.outputs.tags }}
-          REPOLIST="docker.io/$IMG"
-          REPOLIST="ghcr.io/$IMG,$REPOLIST"
-          # Add tag with tag 3.xx as well as RELEASE_3_xx
-          if [[ $IMG = *"RELEASE_"* ]]; then
-            REPOLIST="$(echo $REPOLIST | sed 's/:RELEASE_3_/:3./g'),$REPOLIST"
-          fi
-          # Add tag with R version (based on amd64)
-          docker pull ${{ matrix.base.image }}:${{ matrix.base.amdtag }}
-          RVER=$(docker inspect ${{ matrix.base.image }}:${{ matrix.base.amdtag }} | jq -r '.[].Config.Env[]|select(match("^R_VERSION"))|.[index("=")+1:]')
-          REPOLIST="$(echo $REPOLIST | sed "s/,/-R-$RVER,/g")-R-$RVER,$REPOLIST"
-                    # Also add alternative without _docker when in name
-          if [[ $REPOLIST == *"_docker"* ]]; then
-            REPOLIST="$(echo $REPOLIST | sed 's/_docker//g'),$REPOLIST"
-          fi
-          echo list=$REPOLIST >> $GITHUB_OUTPUT
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.base.outname }}-amd64
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  build-arm64:
+    runs-on: ubuntu-latest-arm64
+    strategy:
+      fail-fast: false
+      matrix:
+        base:
+          - {image: 'ghcr.io/bioconductor/rocker-r-ver', armtag: 'devel-arm64', outname: 'r-ver'}
+          - {image: 'ghcr.io/bioconductor/rocker-rstudio', armtag: 'devel-arm64', outname: 'bioconductor_docker'}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Free root space
+        uses: almahmoud/free-root-space@main
+        with:
+          verbose: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-        with:
-          platforms: linux/amd64,linux/arm64
 
-      - name: Build and push container image to all repos both arm64 and amd64
+      - name: Login to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ github.repository_owner }}/${{ matrix.base.outname }}
+          tags: |
+            type=raw,value={{branch}}
+
+      - name: Build and push ARM64 by digest
+        id: build
         uses: docker/build-push-action@v3
         with:
           build-args: |
             BASE_IMAGE=${{ matrix.base.image }}
             arm64_tag=${{ matrix.base.armtag }}
-            amd64_tag=${{ matrix.base.amdtag }}
           file: Dockerfile
-          push: true
-          tags: ${{ steps.images.outputs.list }}
+          platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
-        if: matrix.base.armtag != 'N/A'
+          outputs: type=image,name=${{ github.repository_owner }}/${{ matrix.base.outname }},push-by-digest=true,name-canonical=true,push=true
 
-      - name: Build and push container image to all repos amd64 only
-        uses: docker/build-push-action@v3
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
         with:
-          build-args: |
-            BASE_IMAGE=${{ matrix.base.image }}
-            amd64_tag=${{ matrix.base.amdtag }}
-          file: Dockerfile
-          push: true
-          tags: ${{ steps.images.outputs.list }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
-        if: matrix.base.armtag == 'N/A'
+          name: digests-${{ matrix.base.outname }}-arm64
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: [build-amd64, build-arm64]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        base:
+          - {image: 'ghcr.io/bioconductor/rocker-r-ver', armtag: 'devel-arm64', outname: 'r-ver'}
+          - {image: 'ghcr.io/bioconductor/rocker-rstudio', armtag: 'devel-arm64', outname: 'bioconductor_docker'}
+          - {image: 'rocker/tidyverse', armtag: 'N/A', outname: 'tidyverse'}
+          - {image: 'ghcr.io/bioconductor/rocker-cuda', armtag: 'N/A', outname: 'cuda'}
+          - {image: 'ghcr.io/bioconductor/rocker-ml', armtag: 'N/A', outname: 'ml'}
+          - {image: 'ghcr.io/bioconductor/rocker-ml-verse', armtag: 'N/A', outname: 'ml-verse'}
+          - {image: 'rocker/shiny', armtag: 'N/A', outname: 'shiny'}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Download AMD64 digests
+        uses: actions/download-artifact@v4
+        with:
+          name: digests-${{ matrix.base.outname }}-amd64
+          path: /tmp/digests/amd64
+
+      - name: Download ARM64 digests
+        if: matrix.base.armtag != 'N/A'
+        uses: actions/download-artifact@v4
+        with:
+          name: digests-${{ matrix.base.outname }}-arm64
+          path: /tmp/digests/arm64
+
+      - name: Set image tags
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            docker.io/${{ github.repository_owner }}/${{ matrix.base.outname }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.base.outname }}
+          tags: |
+            type=raw,value={{branch}}
+
+      - name: Create manifest list and push
+        run: |
+          # Prepare tags
+          TAGS=$(echo '${{ steps.meta.outputs.tags }}' | tr '\n' ' ' | sed 's/ *$//')
+          TAG_ARGS=""
+          for tag in $TAGS; do
+            TAG_ARGS="$TAG_ARGS -t $tag"
+          done
+
+          # Add R version tags for ghcr.io images
+          if [[ "${{ matrix.base.image }}" == *"ghcr.io"* ]]; then
+            R_VER=$(docker pull ${{ matrix.base.image }}:${{ matrix.base.amdtag }} 2>/dev/null && \
+                    docker inspect ${{ matrix.base.image }}:${{ matrix.base.amdtag }} | \
+                    jq -r '.[].Config.Env[]|select(match("^R_VERSION"))|.[index("=")+1:]')
+            if [ ! -z "$R_VER" ]; then
+              for tag in $TAGS; do
+                TAG_ARGS="$TAG_ARGS -t ${tag}-R-${R_VER}"
+              done
+            fi
+          fi
+
+          # Add alternative tags without _docker in name
+          if [[ "${{ matrix.base.outname }}" == *"_docker"* ]]; then
+            for tag in $TAGS; do
+              ALT_TAG=$(echo $tag | sed 's/_docker//')
+              TAG_ARGS="$TAG_ARGS -t $ALT_TAG"
+            done
+          fi
+
+          # Create manifest list
+          if [ "${{ matrix.base.armtag }}" != "N/A" ]; then
+            # Both AMD64 and ARM64
+            DIGESTS=$(cd /tmp/digests && find . -type f -exec echo "${{ github.repository_owner }}/${{ matrix.base.outname }}@sha256:{}" \; | sed 's/\.\//:/')
+          else
+            # AMD64 only
+            DIGESTS=$(cd /tmp/digests/amd64 && find . -type f -exec echo "${{ github.repository_owner }}/${{ matrix.base.outname }}@sha256:{}" \; | sed 's/\.\//:/')
+          fi
+          
+          docker buildx imagetools create $TAG_ARGS $DIGESTS
+
+      - name: Inspect image
+        run: |
+          for tag in ${{ steps.meta.outputs.tags }}; do
+            docker buildx imagetools inspect $tag
+          done
