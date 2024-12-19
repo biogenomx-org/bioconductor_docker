@@ -165,7 +165,9 @@ jobs:
   merge:
     needs: [build-amd64, build-arm64]
     runs-on: ubuntu-latest
+    if: always()
     strategy:
+      fail-fast: false
       matrix:
         base:
           - {image: 'ghcr.io/bioconductor/rocker-r-ver', amdtag: 'devel-amd64', outname: 'r-ver', platforms: 'amd64,arm64'}
