@@ -46,9 +46,9 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata
+      - name: Extract metadata for container image
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ github.repository_owner }}/${{ matrix.base.outname }}
           tags: |
@@ -64,7 +64,7 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ github.repository_owner }}/${{ matrix.base.outname }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ steps.meta.outputs.images }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -114,7 +114,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ github.repository_owner }}/${{ matrix.base.outname }}
           tags: |
@@ -130,7 +130,7 @@ jobs:
           file: Dockerfile
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ github.repository_owner }}/${{ matrix.base.outname }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ steps.meta.outputs.images }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -152,13 +152,13 @@ jobs:
     strategy:
       matrix:
         base:
-          - {image: 'ghcr.io/bioconductor/rocker-r-ver', armtag: 'devel-arm64', outname: 'r-ver'}
-          - {image: 'ghcr.io/bioconductor/rocker-rstudio', armtag: 'devel-arm64', outname: 'bioconductor_docker'}
-          - {image: 'rocker/tidyverse', armtag: 'N/A', outname: 'tidyverse'}
-          - {image: 'ghcr.io/bioconductor/rocker-cuda', armtag: 'N/A', outname: 'cuda'}
-          - {image: 'ghcr.io/bioconductor/rocker-ml', armtag: 'N/A', outname: 'ml'}
-          - {image: 'ghcr.io/bioconductor/rocker-ml-verse', armtag: 'N/A', outname: 'ml-verse'}
-          - {image: 'rocker/shiny', armtag: 'N/A', outname: 'shiny'}
+          - {image: 'ghcr.io/bioconductor/rocker-r-ver', amdtag: 'devel-amd64', outname: 'r-ver', platforms: 'amd64,arm64'}
+          - {image: 'ghcr.io/bioconductor/rocker-rstudio', amdtag: 'devel-amd64', outname: 'bioconductor_docker', platforms: 'amd64,arm64'}
+          - {image: 'rocker/tidyverse', amdtag: 'devel', outname: 'tidyverse', platforms: 'amd64'}
+          - {image: 'ghcr.io/bioconductor/rocker-cuda', amdtag: 'devel-amd64', outname: 'cuda', platforms: 'amd64'}
+          - {image: 'ghcr.io/bioconductor/rocker-ml', amdtag: 'devel-amd64', outname: 'ml', platforms: 'amd64'}
+          - {image: 'ghcr.io/bioconductor/rocker-ml-verse', amdtag: 'devel-amd64', outname: 'ml-verse', platforms: 'amd64'}
+          - {image: 'rocker/shiny', amdtag: 'devel', outname: 'shiny', platforms: 'amd64'}
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -176,14 +176,22 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Echo platforms to build
+        id: buildlist
+        shell: bash
+        run: |
+          PLATFORMLIST="${{matrix.base.platforms}}"
+          IFS=','; for item in $PLATFORMLIST; do echo "$item=build" >> $GITHUB_OUTPUT; done
+
       - name: Download AMD64 digests
+        if: steps.buildlist.outputs.amd64 == "build"
         uses: actions/download-artifact@v4
         with:
           name: digests-${{ matrix.base.outname }}-amd64
           path: /tmp/digests/amd64
 
       - name: Download ARM64 digests
-        if: matrix.base.armtag != 'N/A'
+        if: steps.buildlist.outputs.arm64 == "build"
         uses: actions/download-artifact@v4
         with:
           name: digests-${{ matrix.base.outname }}-arm64
@@ -229,13 +237,8 @@ jobs:
           fi
 
           # Create manifest list
-          if [ "${{ matrix.base.armtag }}" != "N/A" ]; then
-            # Both AMD64 and ARM64
-            DIGESTS=$(cd /tmp/digests && find . -type f -exec echo "${{ github.repository_owner }}/${{ matrix.base.outname }}@sha256:{}" \; | sed 's/\.\//:/')
-          else
-            # AMD64 only
-            DIGESTS=$(cd /tmp/digests/amd64 && find . -type f -exec echo "${{ github.repository_owner }}/${{ matrix.base.outname }}@sha256:{}" \; | sed 's/\.\//:/')
-          fi
+          DIGESTS=$(cd /tmp/digests && find . -type f -exec echo "${{ github.repository_owner }}/${{ matrix.base.outname }}@sha256:{}" \; | sed 's/\.\//:/')
+
           
           docker buildx imagetools create $TAG_ARGS $DIGESTS
 
