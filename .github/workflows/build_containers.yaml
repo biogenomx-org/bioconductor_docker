@@ -57,6 +57,11 @@ jobs:
           tags: |
             type=raw,value={{branch}}
 
+      - name: Extract container name without tag
+        id: vars
+        run: |
+          echo container=$(echo '${{ steps.meta.outputs.tags }}' | awk -F':' '{print $1}') >> $GITHUB_OUTPUT
+
       - name: Build and push AMD64 by digest
         id: build
         uses: docker/build-push-action@v6
@@ -67,7 +72,7 @@ jobs:
           file: Dockerfile
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ steps.meta.outputs.images }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ steps.vars.outputs.container }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -126,6 +131,11 @@ jobs:
           tags: |
             type=raw,value={{branch}}
 
+      - name: Extract container name without tag
+        id: vars
+        run: |
+          echo container=$(echo '${{ steps.meta.outputs.tags }}' | awk -F':' '{print $1}') >> $GITHUB_OUTPUT
+
       - name: Build and push ARM64 by digest
         id: build
         uses: docker/build-push-action@v6
@@ -136,7 +146,7 @@ jobs:
           file: Dockerfile
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ steps.meta.outputs.images }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ steps.vars.outputs.container }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -250,9 +260,11 @@ jobs:
               TAG_ARGS="$TAG_ARGS -t $ALT_TAG"
             done
           fi
+          
+          CONTAINERNAME=$(echo '${{ steps.meta1.outputs.tags }}' | awk -F':' '{print $1}')
 
           # Create manifest list
-          DIGESTS=$(cd /tmp/digests && find . -type f -exec echo "${{ steps.meta1.outputs.images }}@sha256:{}" \; | sed 's/\.\//:/')
+          DIGESTS=$(cd /tmp/digests && find . -type f -exec echo "$CONTAINERNAME@sha256:{}" \; | sed 's/\.\//:/')
           
           docker buildx imagetools create $TAG_ARGS $DIGESTS
 
