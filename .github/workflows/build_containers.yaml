@@ -50,7 +50,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ github.repository_owner }}/${{ matrix.base.outname }}
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.base.outname }}
           tags: |
             type=raw,value={{branch}}
 
@@ -117,7 +117,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ github.repository_owner }}/${{ matrix.base.outname }}
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.base.outname }}
           tags: |
             type=raw,value={{branch}}
 
@@ -200,7 +200,16 @@ jobs:
           path: /tmp/digests/arm64
 
       - name: Set image tags
-        id: meta
+        id: meta1
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.base.outname }}
+          tags: |
+            type=raw,value={{branch}}
+
+      - name: Set image tags
+        id: meta2
         uses: docker/metadata-action@v4
         with:
           images: |
@@ -212,7 +221,7 @@ jobs:
       - name: Create manifest list and push
         run: |
           # Prepare tags
-          TAGS=$(echo '${{ steps.meta.outputs.tags }}' | tr '\n' ' ' | sed 's/ *$//')
+          TAGS=$(echo '${{ steps.meta2.outputs.tags }}' | tr '\n' ' ' | sed 's/ *$//')
           TAG_ARGS=""
           for tag in $TAGS; do
             TAG_ARGS="$TAG_ARGS -t $tag"
@@ -239,13 +248,12 @@ jobs:
           fi
 
           # Create manifest list
-          DIGESTS=$(cd /tmp/digests && find . -type f -exec echo "${{ github.repository_owner }}/${{ matrix.base.outname }}@sha256:{}" \; | sed 's/\.\//:/')
-
+          DIGESTS=$(cd /tmp/digests && find . -type f -exec echo "${{ steps.meta1.outputs.images }}@sha256:{}" \; | sed 's/\.\//:/')
           
           docker buildx imagetools create $TAG_ARGS $DIGESTS
 
       - name: Inspect image
         run: |
-          for tag in ${{ steps.meta.outputs.tags }}; do
+          for tag in ${{ steps.meta2.outputs.tags }}; do
             docker buildx imagetools inspect $tag
           done
