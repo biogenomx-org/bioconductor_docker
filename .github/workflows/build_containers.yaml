@@ -56,14 +56,13 @@ jobs:
 
       - name: Build and push AMD64 by digest
         id: build
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
           build-args: |
             BASE_IMAGE=${{ matrix.base.image }}
             amd64_tag=${{ matrix.base.amdtag }}
           file: Dockerfile
           platforms: linux/amd64
-          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ steps.meta.outputs.images }},push-by-digest=true,name-canonical=true,push=true
 
@@ -123,14 +122,13 @@ jobs:
 
       - name: Build and push ARM64 by digest
         id: build
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
           build-args: |
             BASE_IMAGE=${{ matrix.base.image }}
             arm64_tag=${{ matrix.base.armtag }}
           file: Dockerfile
           platforms: linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ steps.meta.outputs.images }},push-by-digest=true,name-canonical=true,push=true
 
