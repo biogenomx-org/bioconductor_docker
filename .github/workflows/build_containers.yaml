@@ -184,14 +184,14 @@ jobs:
           IFS=','; for item in $PLATFORMLIST; do echo "$item=build" >> $GITHUB_OUTPUT; done
 
       - name: Download AMD64 digests
-        if: steps.buildlist.outputs.amd64 == "build"
+        if: steps.buildlist.outputs.amd64 == 'build'
         uses: actions/download-artifact@v4
         with:
           name: digests-${{ matrix.base.outname }}-amd64
           path: /tmp/digests/amd64
 
       - name: Download ARM64 digests
-        if: steps.buildlist.outputs.arm64 == "build"
+        if: steps.buildlist.outputs.arm64 == 'build'
         uses: actions/download-artifact@v4
         with:
           name: digests-${{ matrix.base.outname }}-arm64
