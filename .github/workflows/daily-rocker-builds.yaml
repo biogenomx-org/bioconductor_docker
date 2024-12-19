@@ -73,8 +73,10 @@ jobs:
   buildrver:
     strategy:
       matrix:
-        arch: [amd64, arm64]
-    runs-on: ubuntu-latest
+        build:
+          - { arch: 'amd64', runner: 'ubuntu-latest' }
+          - { arch: 'arm64', runner: 'ubuntu-latest-arm64' }
+    runs-on: ${{ matrix.build.runner }}
     steps:
     - uses: actions/checkout@v3
 
@@ -91,12 +93,6 @@ jobs:
         echo registryuser=$(echo ${{ github.repository_owner }} | awk '{print tolower($0)}') >> $GITHUB_OUTPUT
         echo rockerintermediateprefix=$(echo "ghcr.io/${{ github.repository_owner }}/rocker" | awk '{print tolower($0)}') >> $GITHUB_OUTPUT
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: arm64
-      if: matrix.arch == 'arm64'
-
     - name: Login to GHCR
       uses: docker/login-action@v2
       with:
@@ -105,12 +101,12 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Prep rocker rocker files
-      run: bash .github/scripts/rocker_prep.sh ${{ steps.defs.outputs.rver }} ${{ steps.defs.outputs.biocver }} ${{ steps.defs.outputs.rockerintermediateprefix }} ${{ matrix.arch }}
+      run: bash .github/scripts/rocker_prep.sh ${{ steps.defs.outputs.rver }} ${{ steps.defs.outputs.biocver }} ${{ steps.defs.outputs.rockerintermediateprefix }} ${{ matrix.build.arch }}
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
       with:
-        platforms: linux/${{ matrix.arch }}
+        platforms: linux/${{ matrix.build.arch }}
 
     - name: Build and push r-ver
       uses: docker/build-push-action@v3
@@ -118,13 +114,16 @@ jobs:
         file: rocker-versioned2/dockerfiles/r-ver_${{ steps.defs.outputs.rver }}.Dockerfile
         context: rocker-versioned2
         push: true
-        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-r-ver:${{ steps.defs.outputs.rver }}-${{ matrix.arch }}
-        platforms: linux/${{ matrix.arch }}
+        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-r-ver:${{ steps.defs.outputs.rver }}-${{ matrix.build.arch }}
+        platforms: linux/${{ matrix.build.arch }}
 
   buildrstudio:
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        build:
+          - { arch: 'amd64', runner: 'ubuntu-latest' }
+          - { arch: 'arm64', runner: 'ubuntu-latest-arm64' }
+    runs-on: ${{ matrix.build.runner }}
     needs: buildrver
     runs-on: ubuntu-latest
     steps:
@@ -147,7 +146,7 @@ jobs:
       uses: docker/setup-qemu-action@v2
       with:
         platforms: arm64
-      if: matrix.arch == 'arm64'
+      if: matrix.build.arch == 'arm64'
 
     - name: Login to GHCR
       uses: docker/login-action@v2
@@ -158,19 +157,19 @@ jobs:
 
     - name: Prep rocker rocker files
       run: |
-        bash .github/scripts/rocker_prep.sh ${{ steps.defs.outputs.rver }} ${{ steps.defs.outputs.biocver }} ${{ steps.defs.outputs.rockerintermediateprefix }} ${{ matrix.arch }}
+        bash .github/scripts/rocker_prep.sh ${{ steps.defs.outputs.rver }} ${{ steps.defs.outputs.biocver }} ${{ steps.defs.outputs.rockerintermediateprefix }} ${{ matrix.build.arch }}
         
 
     - name: Move some tidyverse builds to docker for arm64 to avoid timeout
       run: |
         head -n44 rocker-versioned2/scripts/install_tidyverse.sh >> rocker-versioned2/scripts/install_rstudio.sh
         sed -i "\|RUN /rocker_scripts/install_rstudio.sh|i COPY scripts /rocker_scripts" rocker-versioned2/dockerfiles/rstudio_${{ steps.defs.outputs.rver }}.Dockerfile
-      if: matrix.arch == 'arm64'
+      if: matrix.build.arch == 'arm64'
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
       with:
-        platforms: linux/${{ matrix.arch }}
+        platforms: linux/${{ matrix.build.arch }}
 
     - name: Build and push rstudio
       uses: docker/build-push-action@v3
@@ -178,14 +177,15 @@ jobs:
         file: rocker-versioned2/dockerfiles/rstudio_${{ steps.defs.outputs.rver }}.Dockerfile
         context: rocker-versioned2
         push: true
-        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-rstudio:${{ steps.defs.outputs.rver }}-${{ matrix.arch }}
-        platforms: linux/${{ matrix.arch }}
+        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-rstudio:${{ steps.defs.outputs.rver }}-${{ matrix.build.arch }}
+        platforms: linux/${{ matrix.build.arch }}
 
   buildtidyverse:
     strategy:
       matrix:
-        arch: [amd64, arm64]
-    runs-on: ubuntu-latest
+        build:
+          - { arch: 'amd64', runner: 'ubuntu-latest' }
+    runs-on: ${{ matrix.build.runner }}
     needs: buildrstudio
     steps:
     - uses: actions/checkout@v3
@@ -207,7 +207,7 @@ jobs:
       uses: docker/setup-qemu-action@v2
       with:
         platforms: arm64
-      if: matrix.arch == 'arm64'
+      if: matrix.build.arch == 'arm64'
 
     - name: Login to GHCR
       uses: docker/login-action@v2
@@ -217,12 +217,12 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Prep rocker rocker files
-      run: bash .github/scripts/rocker_prep.sh ${{ steps.defs.outputs.rver }} ${{ steps.defs.outputs.biocver }} ${{ steps.defs.outputs.rockerintermediateprefix }} ${{ matrix.arch }}
+      run: bash .github/scripts/rocker_prep.sh ${{ steps.defs.outputs.rver }} ${{ steps.defs.outputs.biocver }} ${{ steps.defs.outputs.rockerintermediateprefix }} ${{ matrix.build.arch }}
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
       with:
-        platforms: linux/${{ matrix.arch }}
+        platforms: linux/${{ matrix.build.arch }}
 
     - name: Build and push tidyverse
       uses: docker/build-push-action@v3
@@ -230,14 +230,15 @@ jobs:
         file: rocker-versioned2/dockerfiles/tidyverse_${{ steps.defs.outputs.rver }}.Dockerfile
         context: rocker-versioned2
         push: true
-        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-tidyverse:${{ steps.defs.outputs.rver }}-${{ matrix.arch }}
-        platforms: linux/${{ matrix.arch }}
+        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-tidyverse:${{ steps.defs.outputs.rver }}-${{ matrix.build.arch }}
+        platforms: linux/${{ matrix.build.arch }}
 
   mlbuild:
     strategy:
       matrix:
-        arch: [amd64]
-    runs-on: ubuntu-latest
+        build:
+          - { arch: 'amd64', runner: 'ubuntu-latest' }
+    runs-on: ${{ matrix.build.runner }}
     steps:
     - uses: actions/checkout@v3
 
@@ -258,7 +259,7 @@ jobs:
       uses: docker/setup-qemu-action@v2
       with:
         platforms: arm64
-      if: matrix.arch == 'arm64'
+      if: matrix.build.arch == 'arm64'
 
     - name: Login to GHCR
       uses: docker/login-action@v2
@@ -278,8 +279,8 @@ jobs:
         # Package archived from CRAN
         sed -i '/rmdshower/d' rocker-versioned2/scripts/install_verse.sh
 
-        sed -i 's#rocker/cuda:${{ steps.defs.outputs.rver }}#${{ steps.defs.outputs.rockerintermediateprefix }}-cuda:${{ steps.defs.outputs.rver }}-${{ matrix.arch }}#g' rocker-versioned2/dockerfiles/ml_${{ steps.defs.outputs.rver }}.Dockerfile
-        sed -i 's#rocker/ml:${{ steps.defs.outputs.rver }}#${{ steps.defs.outputs.rockerintermediateprefix }}-ml:${{ steps.defs.outputs.rver }}-${{ matrix.arch }}#g' rocker-versioned2/dockerfiles/ml-verse_${{ steps.defs.outputs.rver }}.Dockerfile
+        sed -i 's#rocker/cuda:${{ steps.defs.outputs.rver }}#${{ steps.defs.outputs.rockerintermediateprefix }}-cuda:${{ steps.defs.outputs.rver }}-${{ matrix.build.arch }}#g' rocker-versioned2/dockerfiles/ml_${{ steps.defs.outputs.rver }}.Dockerfile
+        sed -i 's#rocker/ml:${{ steps.defs.outputs.rver }}#${{ steps.defs.outputs.rockerintermediateprefix }}-ml:${{ steps.defs.outputs.rver }}-${{ matrix.build.arch }}#g' rocker-versioned2/dockerfiles/ml-verse_${{ steps.defs.outputs.rver }}.Dockerfile
 
         echo "Bioconductor Version: ${{ steps.defs.outputs.biocver }}"
         if [ "${{ steps.defs.outputs.rver }}" == "devel" ]; then
@@ -291,7 +292,7 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
       with:
-        platforms: linux/${{ matrix.arch }}
+        platforms: linux/${{ matrix.build.arch }}
 
     - name: Build and load cuda
       uses: docker/build-push-action@v3
@@ -299,8 +300,8 @@ jobs:
         file: rocker-versioned2/dockerfiles/cuda_${{ steps.defs.outputs.rver }}.Dockerfile
         context: rocker-versioned2
         push: true
-        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-cuda:${{ steps.defs.outputs.rver }}-${{ matrix.arch }}
-        platforms: linux/${{ matrix.arch }}
+        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-cuda:${{ steps.defs.outputs.rver }}-${{ matrix.build.arch }}
+        platforms: linux/${{ matrix.build.arch }}
 
     - name: Build and load ml
       uses: docker/build-push-action@v3
@@ -308,8 +309,8 @@ jobs:
         file: rocker-versioned2/dockerfiles/ml_${{ steps.defs.outputs.rver }}.Dockerfile
         context: rocker-versioned2
         push: true
-        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-ml:${{ steps.defs.outputs.rver }}-${{ matrix.arch }}
-        platforms: linux/${{ matrix.arch }}
+        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-ml:${{ steps.defs.outputs.rver }}-${{ matrix.build.arch }}
+        platforms: linux/${{ matrix.build.arch }}
 
     - name: Build and load ml-verse
       uses: docker/build-push-action@v3
@@ -317,6 +318,6 @@ jobs:
         file: rocker-versioned2/dockerfiles/ml-verse_${{ steps.defs.outputs.rver }}.Dockerfile
         context: rocker-versioned2
         push: true
-        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-ml-verse:${{ steps.defs.outputs.rver }}-${{ matrix.arch }}
-        platforms: linux/${{ matrix.arch }}
+        tags: ${{ steps.defs.outputs.rockerintermediateprefix }}-ml-verse:${{ steps.defs.outputs.rver }}-${{ matrix.build.arch }}
+        platforms: linux/${{ matrix.build.arch }}
 
