@@ -245,7 +245,7 @@ jobs:
 
           # Add R version tags for ghcr.io images
           if [[ "${{ matrix.base.image }}" == *"ghcr.io"* ]]; then
-            R_VER=$(docker pull ${{ matrix.base.image }}:${{ matrix.base.amdtag }} 2>/dev/null && \
+            R_VER=$(docker pull ${{ matrix.base.image }}:${{ matrix.base.amdtag }} 2>&1 > /dev/null && \
                     docker inspect ${{ matrix.base.image }}:${{ matrix.base.amdtag }} | \
                     jq -r '.[].Config.Env[]|select(match("^R_VERSION"))|.[index("=")+1:]')
             if [ ! -z "$R_VER" ]; then
