@@ -266,8 +266,11 @@ jobs:
           CONTAINERNAME=$(echo '${{ steps.meta1.outputs.tags }}' | awk -F':' '{print $1}')
 
           # Create manifest list
-          DIGESTS=$(cd /tmp/digests && find . -type f -exec echo "$CONTAINERNAME@sha256:{}" \; | sed 's/\.\//:/')
-          
+          DIGESTS=""
+          for eachdir in $(ls /tmp/digests); do
+              DIGESTS_ARCH=$(cd /tmp/digests/$eachdir && find . -type f -exec echo "$CONTAINERNAME@sha256{}" \; | sed 's/\.\//:/')
+              DIGESTS="$DIGESTS $DIGESTS_ARCH"
+          done
           docker buildx imagetools create $TAG_ARGS $DIGESTS
 
       - name: Inspect image
