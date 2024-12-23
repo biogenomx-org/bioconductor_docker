@@ -240,7 +240,7 @@ jobs:
           # Prepare tags
           TAGS=$(printf "%s" '${{ steps.meta2.outputs.tags }}' | tr '\n' ' ' | sed 's/ *$//')
           TAG_ARGS=""
-          for tag in $TAGS; do
+          for tag in "$TAGS"; do
             TAG_ARGS="$TAG_ARGS -t $tag"
           done
 
