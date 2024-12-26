@@ -272,8 +272,6 @@ jobs:
           done
           docker buildx imagetools create $TAG_ARGS $DIGESTS
 
-      - name: Inspect image
+      - name: Inspect images
         run: |
-          for tag in ${{ steps.meta2.outputs.tags }}; do
-            docker buildx imagetools inspect $tag
-          done
+          cat /tmp/tags | xargs -i bash -c 'docker buildx imagetools inspect {}'
