@@ -10,7 +10,7 @@ on:
       check-rocker-image:
         default: "rocker/rstudio"
   schedule:
-    - cron: '0 18 * * *'
+    - cron: '0 18 */4 * *'
 
 jobs:
   check_versions:
