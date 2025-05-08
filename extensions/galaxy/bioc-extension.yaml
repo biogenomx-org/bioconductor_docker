@@ -2,4 +2,6 @@ container:
   outname: galaxy-rstudio
   base:
     image: ghcr.io/bioconductor/bioconductor
-    tag: {"3.21", "devel"}
+    tag:
+      - "3.21"
+      - "devel"
