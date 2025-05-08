@@ -5,12 +5,22 @@ on:
       - devel
       - RELEASE_*
   workflow_dispatch:
+    inputs:
+      only_extensions:
+        description: 'Run only the extensions part of the workflow'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
   schedule:
     - cron: '0 18 * * 5'
 
 jobs:
   build-amd64:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.only_extensions != 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -90,6 +100,7 @@ jobs:
 
   build-arm64:
     runs-on: ubuntu-latest-arm64
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.only_extensions != 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -165,7 +176,7 @@ jobs:
   merge:
     needs: [build-amd64, build-arm64]
     runs-on: ubuntu-latest
-    if: always()
+    if: ${{ always() && (github.event_name != 'workflow_dispatch' || github.event.inputs.only_extensions != 'true') }}
     strategy:
       fail-fast: false
       matrix:
@@ -282,8 +293,8 @@ jobs:
 
   extensions:
     needs: [merge]
+    if: ${{ always() && (github.event_name != 'workflow_dispatch' || needs.merge.result != 'skipped') }}
     runs-on: ubuntu-latest
-    if: always()
     steps:
       - uses: actions/checkout@v4
       
