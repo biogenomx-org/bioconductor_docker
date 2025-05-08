@@ -311,6 +311,12 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Install dependencies
+        run: |
+          # Install yq for YAML parsing
+          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+
       - name: Find extensions
         id: find_extensions
         run: |
@@ -327,15 +333,22 @@ jobs:
             
             echo "Processing extension: $ext_name from $ext_file"
             
-            # Parse the YAML file to get outname and base image details
-            outname=$(grep -A2 outname "$ext_file" | grep -v outname | grep -v ":" | tr -d ' ' | tr -d '"' | tr -d "'")
-            base_image=$(grep -A2 image "$ext_file" | grep -v image | grep -v ":" | tr -d ' ' | tr -d '"' | tr -d "'")
+            # Parse YAML directly using yq
+            outname=$(yq '.container.outname' "$ext_file")
+            base_image=$(yq '.container.base.image' "$ext_file")
             
-            # Handle tags - could be a single tag or a list
-            tags=$(grep -A5 tag "$ext_file" | grep -v tag | grep -v ":" | tr -d ' ' | tr -d '"' | tr -d "'" | tr -d "{" | tr -d "}" | tr "," " ")
+            # Handle tags which could be a string, list, or map
+            tags=$(yq -o=json '.container.base.tag' "$ext_file")
             
-            if [ -z "$tags" ]; then
+            # Process tags based on their type
+            if [[ "$tags" == "null" ]]; then
               tags="$branch"
+            elif [[ "$tags" == "{\"*\"}" ]]; then
+              # Handle object format like {"3.21", "devel"}
+              tags=$(echo "$tags" | jq -r 'keys | join(" ")')
+            elif [[ "$tags" == "[*]" ]]; then
+              # Handle array format
+              tags=$(echo "$tags" | jq -r 'join(" ")')
             fi
             
             echo "Building extension $ext_name: $outname from $base_image with tags: $tags"
