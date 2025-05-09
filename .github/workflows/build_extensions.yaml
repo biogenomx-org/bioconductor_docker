@@ -69,10 +69,15 @@ jobs:
             echo "Building all available extensions"
           fi
 
-      - name: Process extensions
+      - name: Extract extension data to files
         run: |
-          mkdir -p /tmp/extension_builds
           branch="${GITHUB_REF##*/}"
+          
+          # Create empty files
+          > /tmp/basenames.txt
+          > /tmp/basetags.txt
+          > /tmp/outnames.txt
+          > /tmp/dirs.txt
           
           for ext_file in $(echo "${{ steps.find_extensions.outputs.extensions }}"); do
             ext_dir=$(dirname "$ext_file")
@@ -84,41 +89,63 @@ jobs:
             outname=$(yq '.container.outname' "$ext_file")
             base_image=$(yq '.container.base.image' "$ext_file")
             
-            # Handle tags which could be a string, list, or map
-            tags=$(yq -o=json '.container.base.tag' "$ext_file")
-            
-            # Process tags based on their type
-            if [[ "$tags" == "null" ]]; then
-              tags="$branch"
-            elif [[ "$tags" == "{\"*\"}" ]]; then
-              # Handle object format like {"3.21", "devel"}
-              tags=$(echo "$tags" | jq -r 'keys | join(" ")')
-            elif [[ "$tags" == "[*]" ]]; then
-              # Handle array format
-              tags=$(echo "$tags" | jq -r 'join(" ")')
+            # Check if Dockerfile exists
+            if [[ ! -f "$ext_dir/Dockerfile" ]]; then
+              echo "::warning::No Dockerfile found for extension $ext_name, skipping"
+              continue
             fi
             
-            echo "Building extension $ext_name: $outname from $base_image with tags: $tags"
+            # Handle tags
+            tags_count=$(yq '.container.base.tag | length' "$ext_file")
             
-            # Process each tag
-            for tag in $tags; do
-              echo "Building for tag: $tag"
-              
-              # Check for Dockerfile in extension directory
-              if [ -f "$ext_dir/Dockerfile" ]; then
-                echo "Using extension Dockerfile at $ext_dir/Dockerfile"
-                
-                docker buildx build --platform linux/amd64 \
-                  -t "ghcr.io/${{ github.repository_owner }}/$outname:$tag" \
-                  -t "docker.io/${{ github.repository_owner }}/$outname:$tag" \
-                  --build-arg BASE_IMAGE=$base_image \
-                  --build-arg TAG=$tag \
-                  --push \
-                  "$ext_dir"
-                
-                echo "Successfully built and pushed $outname:$tag"
-              else
-                echo "No Dockerfile found for extension $ext_name"
-              fi
-            done
+            # If no tags defined, use branch name as default tag
+            if [[ $tags_count -eq 0 ]]; then
+              echo "$outname" >> /tmp/outnames.txt
+              echo "$base_image" >> /tmp/basenames.txt
+              echo "$branch" >> /tmp/basetags.txt
+              echo "$ext_dir" >> /tmp/dirs.txt
+            else
+              # For each tag, create a line in each file
+              for (( i=0; i<$tags_count; i++ )); do
+                tag=$(yq ".container.base.tag[$i]" "$ext_file")
+                echo "$outname" >> /tmp/outnames.txt
+                echo "$base_image" >> /tmp/basenames.txt
+                echo "$tag" >> /tmp/basetags.txt
+                echo "$ext_dir" >> /tmp/dirs.txt
+              done
+            fi
+          done
+          
+          echo "Files created with build data:"
+          echo "===== Outnames ====="
+          cat /tmp/outnames.txt
+          echo "===== Base Images ====="
+          cat /tmp/basenames.txt
+          echo "===== Tags ====="
+          cat /tmp/basetags.txt
+          echo "===== Directories ====="
+          cat /tmp/dirs.txt
+
+      - name: Build extensions
+        run: |
+          # Check if we have any extensions to build
+          if [[ ! -s /tmp/outnames.txt ]]; then
+            echo "No extensions to build"
+            exit 0
+          fi
+          
+          # Process line by line with paste command
+          paste /tmp/outnames.txt /tmp/basenames.txt /tmp/basetags.txt /tmp/dirs.txt | while read outname base_image tag ext_dir; do
+            echo "Building $outname:$tag from $base_image:$tag using Dockerfile in $ext_dir"
+            
+            # Build and push
+            docker buildx build --platform linux/amd64 \
+              -t "ghcr.io/${{ github.repository_owner }}/$outname:$tag" \
+              -t "docker.io/${{ github.repository_owner }}/$outname:$tag" \
+              --build-arg BASE_IMAGE=$base_image \
+              --build-arg TAG=$tag \
+              --push \
+              "$ext_dir"
+            
+            echo "Successfully built and pushed $outname:$tag"
           done
