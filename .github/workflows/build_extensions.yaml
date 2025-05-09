@@ -85,9 +85,9 @@ jobs:
             
             echo "Processing extension: $ext_name from $ext_file"
             
-            # Parse YAML directly using yq
-            outname=$(yq '.container.outname' "$ext_file")
-            base_image=$(yq '.container.base.image' "$ext_file")
+            # Parse YAML directly using yq - convert outname to lowercase
+            outname=$(yq '.container.outname' "$ext_file" | tr '[:upper:]' '[:lower:]')
+            base_image=$(yq '.container.base.image' "$ext_file" | tr '[:upper:]' '[:lower:]')
             
             # Check if Dockerfile exists
             if [[ ! -f "$ext_dir/Dockerfile" ]]; then
@@ -134,14 +134,18 @@ jobs:
             exit 0
           fi
           
+          # Convert repository owner to lowercase for Docker compatibility
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_OWNER_LOWER=$(echo "$REPO_OWNER" | tr '[:upper:]' '[:lower:]')
+          
           # Process line by line with paste command
           paste /tmp/outnames.txt /tmp/basenames.txt /tmp/basetags.txt /tmp/dirs.txt | while read outname base_image tag ext_dir; do
             echo "Building $outname:$tag from $base_image:$tag using Dockerfile in $ext_dir"
             
-            # Build and push
+            # Build and push with lowercase names
             docker buildx build --platform linux/amd64 \
-              -t "ghcr.io/${{ github.repository_owner }}/$outname:$tag" \
-              -t "docker.io/${{ github.repository_owner }}/$outname:$tag" \
+              -t "ghcr.io/$REPO_OWNER_LOWER/$outname:$tag" \
+              -t "docker.io/$REPO_OWNER_LOWER/$outname:$tag" \
               --build-arg BASE_IMAGE=$base_image \
               --build-arg TAG=$tag \
               --push \
