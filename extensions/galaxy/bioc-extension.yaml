@@ -3,5 +3,5 @@ container:
   base:
     image: ghcr.io/bioconductor/bioconductor
     tag:
-      - "3.21"
+      - "RELEASE_3_21"
       - "devel"
