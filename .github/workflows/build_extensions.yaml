@@ -51,43 +51,34 @@ jobs:
           wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           chmod +x /usr/local/bin/yq
 
-      - name: Find extensions
-        id: find_extensions
+      - name: Process and build extensions
         run: |
+          # Get branch name
+          branch="${GITHUB_REF##*/}"
+          
+          # Convert repository owner to lowercase for Docker compatibility
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_OWNER_LOWER=$(echo "$REPO_OWNER" | tr '[:upper:]' '[:lower:]')
+          
+          # Find extensions based on input or search all
           if [[ -n "${{ github.event.inputs.specific_extension }}" ]]; then
-            # Check if the specified extension exists
-            if [[ -d "extensions/${{ github.event.inputs.specific_extension }}" ]]; then
-              echo "extensions=$(find extensions/${{ github.event.inputs.specific_extension }} -name 'bioc-extension.yaml')" >> $GITHUB_OUTPUT
-              echo "Building specific extension: ${{ github.event.inputs.specific_extension }}"
-            else
+            if [[ ! -d "extensions/${{ github.event.inputs.specific_extension }}" ]]; then
               echo "::error::Extension directory not found: extensions/${{ github.event.inputs.specific_extension }}"
               exit 1
             fi
+            extension_files=$(find extensions/${{ github.event.inputs.specific_extension }} -name 'bioc-extension.yaml')
+            echo "Building specific extension: ${{ github.event.inputs.specific_extension }}"
           else
-            # Find all extensions
-            echo "extensions=$(find extensions -name 'bioc-extension.yaml' | sort)" >> $GITHUB_OUTPUT
+            extension_files=$(find extensions -name 'bioc-extension.yaml' | sort)
             echo "Building all available extensions"
           fi
-
-      - name: Extract extension data to files
-        run: |
-          branch="${GITHUB_REF##*/}"
           
-          # Create empty files
-          > /tmp/basenames.txt
-          > /tmp/basetags.txt
-          > /tmp/outnames.txt
-          > /tmp/dirs.txt
-          
-          for ext_file in $(echo "${{ steps.find_extensions.outputs.extensions }}"); do
+          # Process each extension file directly
+          for ext_file in $extension_files; do
             ext_dir=$(dirname "$ext_file")
             ext_name=$(basename "$ext_dir")
             
             echo "Processing extension: $ext_name from $ext_file"
-            
-            # Parse YAML directly using yq - convert outname to lowercase
-            outname=$(yq '.container.outname' "$ext_file" | tr '[:upper:]' '[:lower:]')
-            base_image=$(yq '.container.base.image' "$ext_file" | tr '[:upper:]' '[:lower:]')
             
             # Check if Dockerfile exists
             if [[ ! -f "$ext_dir/Dockerfile" ]]; then
@@ -95,61 +86,43 @@ jobs:
               continue
             fi
             
+            # Parse YAML directly using yq
+            outname=$(yq '.container.outname' "$ext_file" | tr '[:upper:]' '[:lower:]')
+            base_image=$(yq '.container.base.image' "$ext_file" | tr '[:upper:]' '[:lower:]')
+            
             # Handle tags
             tags_count=$(yq '.container.base.tag | length' "$ext_file")
             
-            # If no tags defined, use branch name as default tag
+            # Build for each tag (or branch name if no tags specified)
             if [[ $tags_count -eq 0 ]]; then
-              echo "$outname" >> /tmp/outnames.txt
-              echo "$base_image" >> /tmp/basenames.txt
-              echo "$branch" >> /tmp/basetags.txt
-              echo "$ext_dir" >> /tmp/dirs.txt
+              tags=("$branch")
             else
-              # For each tag, create a line in each file
+              # Get all tags as an array
+              tags=()
               for (( i=0; i<$tags_count; i++ )); do
-                tag=$(yq ".container.base.tag[$i]" "$ext_file")
-                echo "$outname" >> /tmp/outnames.txt
-                echo "$base_image" >> /tmp/basenames.txt
-                echo "$tag" >> /tmp/basetags.txt
-                echo "$ext_dir" >> /tmp/dirs.txt
+                tags+=("$(yq ".container.base.tag[$i]" "$ext_file")")
               done
             fi
-          done
-          
-          echo "Files created with build data:"
-          echo "===== Outnames ====="
-          cat /tmp/outnames.txt
-          echo "===== Base Images ====="
-          cat /tmp/basenames.txt
-          echo "===== Tags ====="
-          cat /tmp/basetags.txt
-          echo "===== Directories ====="
-          cat /tmp/dirs.txt
-
-      - name: Build extensions
-        run: |
-          # Check if we have any extensions to build
-          if [[ ! -s /tmp/outnames.txt ]]; then
-            echo "No extensions to build"
-            exit 0
-          fi
-          
-          # Convert repository owner to lowercase for Docker compatibility
-          REPO_OWNER="${{ github.repository_owner }}"
-          REPO_OWNER_LOWER=$(echo "$REPO_OWNER" | tr '[:upper:]' '[:lower:]')
-          
-          # Process line by line with paste command
-          paste /tmp/outnames.txt /tmp/basenames.txt /tmp/basetags.txt /tmp/dirs.txt | while read outname base_image tag ext_dir; do
-            echo "Building $outname:$tag from $base_image:$tag using Dockerfile in $ext_dir"
             
-            # Build and push with lowercase names
-            docker buildx build --platform linux/amd64 \
-              -t "ghcr.io/$REPO_OWNER_LOWER/$outname:$tag" \
-              -t "docker.io/$REPO_OWNER_LOWER/$outname:$tag" \
-              --build-arg BASE_IMAGE=$base_image \
-              --build-arg TAG=$tag \
-              --push \
-              "$ext_dir"
-            
-            echo "Successfully built and pushed $outname:$tag"
+            # Build for each tag
+            for tag in "${tags[@]}"; do
+              echo "Building $outname:$tag from $base_image:$tag using Dockerfile in $ext_dir"
+              
+              # Build and push with lowercase names
+              docker buildx build --platform linux/amd64 \
+                -t "ghcr.io/$REPO_OWNER_LOWER/$outname:$tag" \
+                -t "docker.io/$REPO_OWNER_LOWER/$outname:$tag" \
+                --build-arg BASE_IMAGE=$base_image \
+                --build-arg TAG=$tag \
+                --push \
+                "$ext_dir"
+              
+              build_result=$?
+              if [ $build_result -ne 0 ]; then
+                echo "::error::Failed to build $outname:$tag"
+                exit $build_result
+              fi
+              
+              echo "Successfully built and pushed $outname:$tag"
+            done
           done
