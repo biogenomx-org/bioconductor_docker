@@ -250,29 +250,7 @@ jobs:
             cat /tmp/tags | xargs -i bash -c 'printf "%s" "-t {} " >> /tmp/tagargs'
             TAG_ARGS="$(cat /tmp/tagargs)"
             TAGS="$(cat /tmp/tags)"
-            
-            # Process each tag to generate additional format variants
-            PROCESSED_TAGS=""
-            ADDITIONAL_TAG_ARGS=""
-            
-            for tag in $TAGS; do
-              # Original tag is always included
-              PROCESSED_TAGS="$PROCESSED_TAGS $tag"
-              
-              # For RELEASE_X_YY format tags, also create X.YY format with simple sed operations
-              if echo "$tag" | grep -q "RELEASE_"; then
-                # First remove RELEASE_ prefix, then replace _ with .
-                VERSION_TAG=$(echo "$tag" | sed 's/:RELEASE_/:/g' | sed 's/_/./g')
-                echo "Adding version tag: $VERSION_TAG"
-                PROCESSED_TAGS="$PROCESSED_TAGS $VERSION_TAG"
-                ADDITIONAL_TAG_ARGS="$ADDITIONAL_TAG_ARGS -t $VERSION_TAG"
-              fi
-            done
-            
-            # Add additional tags to tag arguments
-            TAG_ARGS="$TAG_ARGS $ADDITIONAL_TAG_ARGS"
-            TAGS="$PROCESSED_TAGS"
-            
+  
             R_VER=$(docker pull ${{ matrix.base.image }}:${{ matrix.base.amdtag }} 2>&1 > /dev/null && \
                     docker inspect ${{ matrix.base.image }}:${{ matrix.base.amdtag }} | \
                     jq -r '.[].Config.Env[]|select(match("^R_VERSION"))|.[index("=")+1:]')
@@ -285,6 +263,12 @@ jobs:
             # Add alternative tags without _docker in name
             if [[ "${{ matrix.base.outname }}" == *"_docker"* ]]; then
               ALT_TAG=$(echo $TAG_ARGS | sed 's/_docker//g')
+              TAG_ARGS="$TAG_ARGS $ALT_TAG"
+            fi
+
+            # Add alternative tags without RELEASE_ in the tag
+            if grep -q "RELEASE_" <<< "$TAG_ARGS"; then
+              ALT_TAG=$(echo $TAG_ARGS | sed -E 's/RELEASE_([0-9]+)_([0-9]+)/\1.\2/g')
               TAG_ARGS="$TAG_ARGS $ALT_TAG"
             fi
             
