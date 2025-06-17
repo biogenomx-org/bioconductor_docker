@@ -54,4 +54,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends gnupg lsb-relea
 EXPOSE $RSTUDIO_PORT
 
 ENTRYPOINT ["/bin/sh"]
-CMD ["/init"]
+CMD ["-c", "/init"]
