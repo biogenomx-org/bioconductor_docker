@@ -21,7 +21,7 @@ ARG BIOCONDUCTOR_VERSION=3.23
 ##### IMPORTANT ########
 ## The PATCH version number should be incremented each time
 ## there is a change in the Dockerfile.
-ARG BIOCONDUCTOR_PATCH=0
+ARG BIOCONDUCTOR_PATCH=1
 
 ARG BIOCONDUCTOR_DOCKER_VERSION=${BIOCONDUCTOR_VERSION}.${BIOCONDUCTOR_PATCH}
 
@@ -52,6 +52,11 @@ ENV TARGETARCH=${TARGETARCH:-amd64}
 FROM base-$TARGETARCH AS final
 COPY --from=base / /
 
+# Reset args in last layer
+ARG BIOCONDUCTOR_VERSION=3.23
+ARG BIOCONDUCTOR_PATCH=1
+ARG BIOCONDUCTOR_DOCKER_VERSION=${BIOCONDUCTOR_VERSION}.${BIOCONDUCTOR_PATCH}
+
 LABEL name="bioconductor/bioconductor_docker" \
       version=$BIOCONDUCTOR_DOCKER_VERSION \
       url="https://github.com/Bioconductor/bioconductor_docker" \
@@ -59,11 +64,6 @@ LABEL name="bioconductor/bioconductor_docker" \
       maintainer="maintainer@bioconductor.org" \
       description="Bioconductor docker image with system dependencies to install all packages." \
       license="Artistic-2.0"
-
-# Reset args in last layer
-ARG BIOCONDUCTOR_VERSION=3.23
-ARG BIOCONDUCTOR_PATCH=0
-ARG BIOCONDUCTOR_DOCKER_VERSION=${BIOCONDUCTOR_VERSION}.${BIOCONDUCTOR_PATCH}
 
 # Set automatically when building with --platform
 ARG TARGETPLATFORM
