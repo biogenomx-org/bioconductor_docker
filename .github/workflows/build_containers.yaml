@@ -20,7 +20,7 @@ jobs:
           - {image: 'rocker/r-ver', amdtag: 'devel', outname: 'r-ver'}
           - {image: 'rocker/rstudio', amdtag: 'devel', outname: 'bioconductor_docker'}
           - {image: 'rocker/tidyverse', amdtag: 'devel', outname: 'tidyverse'}
-          - {image: 'rocker/shiny', amdtag: 'devel', outname: 'shiny'}
+          - {image: 'ghcr.io/bioconductor/rocker-shiny', amdtag: 'devel-amd64', outname: 'shiny'}
          # - {image: 'ghcr.io/bioconductor/rocker-cuda', amdtag: 'devel-amd64', outname: 'cuda'}
          # - {image: 'ghcr.io/bioconductor/rocker-ml', amdtag: 'devel-amd64', outname: 'ml'}
          # - {image: 'ghcr.io/bioconductor/rocker-ml-verse', amdtag: 'devel-amd64', outname: 'ml-verse'}
@@ -175,7 +175,7 @@ jobs:
           - {image: 'rocker/r-ver', amdtag: 'devel', outname: 'r-ver', platforms: 'amd64,arm64'}
           - {image: 'rocker/rstudio', amdtag: 'devel', outname: 'bioconductor_docker', platforms: 'amd64,arm64'}
           - {image: 'rocker/tidyverse', amdtag: 'devel', outname: 'tidyverse', platforms: 'amd64'}
-          - {image: 'rocker/shiny', amdtag: 'devel', outname: 'shiny', platforms: 'amd64'}
+          - {image: 'ghcr.io/bioconductor/rocker-shiny', amdtag: 'devel-amd64', outname: 'shiny', platforms: 'amd64'}
           #- {image: 'ghcr.io/bioconductor/rocker-cuda', amdtag: 'devel-amd64', outname: 'cuda', platforms: 'amd64'}
           #- {image: 'ghcr.io/bioconductor/rocker-ml', amdtag: 'devel-amd64', outname: 'ml', platforms: 'amd64'}
           #- {image: 'ghcr.io/bioconductor/rocker-ml-verse', amdtag: 'devel-amd64', outname: 'ml-verse', platforms: 'amd64'}
