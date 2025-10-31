@@ -222,6 +222,7 @@ jobs:
 
   buildshiny:
     strategy:
+      fail-fast: false
       matrix:
         build:
           - { arch: 'amd64', runner: 'ubuntu-latest' }
