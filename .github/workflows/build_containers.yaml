@@ -6,6 +6,14 @@ on:
       - RELEASE_*
     paths-ignore:
       - 'extensions/**'
+      - .github/workflows/build_apptainer.yaml
+      - .github/workflows/build_extensions.yaml
+      - .github/workflows/full-rstudio-build.yml
+      - .github/workflows/image-scan.yml
+      - .github/workflows/rocker-builds.yaml
+      - .github/workflows/update_latest.yaml
+      - .github/workflows/weekly-release-bump.yaml
+      - .github/ISSUE_TEMPLATE/**
   workflow_dispatch:
   schedule:
     - cron: '0 18 * * 5'
