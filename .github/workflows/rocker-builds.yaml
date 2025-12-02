@@ -297,6 +297,7 @@ jobs:
       run: |
         docker pull rocker/cuda:${{ matrix.build.cudatag }}
 
+
     - name: Extract R version and CUDA version
       id: versions
       run: |
@@ -308,16 +309,28 @@ jobs:
         R_VER=$(docker exec "$CONTAINER_ID" Rscript -e 'cat(as.character(getRversion()))' 2>/dev/null || echo "unknown")
         echo "r_version=$R_VER" >> $GITHUB_OUTPUT
         echo "Detected R version: $R_VER"
-        
-        # Extract CUDA version by running pytorch in the container
-        CUDA_VER=$(docker exec "$CONTAINER_ID" python3 -c "import torch; print(torch.version.cuda)" 2>/dev/null || echo "unknown")
+
+        # Extract CUDA version - try multiple methods
+        # Method 1: Try pytorch (for amd64)
+        CUDA_VER=$(docker exec "$CONTAINER_ID" python3 -c "import torch; print(torch.version.cuda)" 2>/dev/null || echo "")
+
+        # Method 2: Check CUDA_VERSION environment variable (for arm64)
+        if [ -z "$CUDA_VER" ]; then
+          CUDA_VER=$(docker exec "$CONTAINER_ID" bash -c 'echo $CUDA_VERSION' 2>/dev/null || echo "")
+        fi
+
+        # If still empty, set to unknown
+        if [ -z "$CUDA_VER" ]; then
+          CUDA_VER="unknown"
+        fi
+
         echo "cuda_version=$CUDA_VER" >> $GITHUB_OUTPUT
         echo "Detected CUDA version: $CUDA_VER"
-        
+
         # Stop and remove the container
         docker stop "$CONTAINER_ID"
         docker rm "$CONTAINER_ID"
-        
+
         # Get lowercase repository owner
         OWNER_LOWER=$(echo "${{ github.repository_owner }}" | awk '{print tolower($0)}')
         echo "owner=$OWNER_LOWER" >> $GITHUB_OUTPUT
